@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <title>Přehrávač – vcelky.mp3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height:100vh;
+      margin:0;
+      background:#fdfdfd;
+      font-family:system-ui,sans-serif;
+    }
+    audio{width:90%;max-width:600px;}
+  </style>
+</head>
+<body>
+  <audio controls preload="metadata">
+    <source src="vcelky.mp3" type="audio/mpeg">
+    Váš prohlížeč nepodporuje element <code>&lt;audio&gt;</code>.
+    <a href="vcelky.mp3">Stáhněte si soubor MP3</a>.
+  </audio>
+</body>
+</html>
