@@ -2,26 +2,90 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <title>Přehrávač – vcelky.mp3</title>
+  <title>Včelky – vlastní přehrávač</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
+    /* --- vzhled stránky --- */
     body{
       display:flex;
       justify-content:center;
       align-items:center;
       min-height:100vh;
       margin:0;
-      background:#fdfdfd;
+      background:#fdfbf7;               /* jemný krémový podklad */
       font-family:system-ui,sans-serif;
     }
-    audio{width:90%;max-width:600px;}
+
+    /* --- vlastní tlačítko --- */
+    #player-btn{
+      width:120px;
+      height:120px;
+      border:none;
+      border-radius:50%;
+      background:#ffcc33;               /* „včelí“ žlutá */
+      box-shadow:0 4px 10px rgba(0,0,0,.15);
+      cursor:pointer;
+      transition:transform .15s ease;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+    #player-btn:hover{transform:scale(1.06);}
+    #player-btn:active{transform:scale(.95);}
+
+    /* ikona se bude přepínat přes data-icon v CSS */
+    .icon{
+      width:48px;
+      height:48px;
+      fill:#2d2d2d;                     /* tmavě šedá */
+      pointer-events:none;
+    }
   </style>
 </head>
+
 <body>
-  <audio controls preload="metadata">
-    <source src="vcelky.mp3" type="audio/mpeg">
-    Váš prohlížeč nepodporuje element <code>&lt;audio&gt;</code>.
-    <a href="vcelky.mp3">Stáhněte si soubor MP3</a>.
-  </audio>
+  <!-- audio schováme; ovládáme ho JavaScriptem -->
+  <audio id="audio" src="vcelky.mp3" preload="metadata"></audio>
+
+  <!-- jediné tlačítko -->
+  <button id="player-btn" aria-label="Přehrát">
+    <!-- SVG play-ikona (výchozí) -->
+    <svg class="icon" id="play-icon" viewBox="0 0 24 24">
+      <path d="M8 5v14l11-7z"/>
+    </svg>
+    <!-- SVG pause-ikona (skrytá dokud se nepřehrává) -->
+    <svg class="icon" id="pause-icon" viewBox="0 0 24 24" style="display:none">
+      <path d="M6 19h4V5H6zm8-14v14h4V5z"/>
+    </svg>
+  </button>
+
+  <script>
+    const audio      = document.getElementById('audio');
+    const btn        = document.getElementById('player-btn');
+    const playIcon   = document.getElementById('play-icon');
+    const pauseIcon  = document.getElementById('pause-icon');
+
+    // přepnutí vzhledu tlačítka
+    function toggleIcons(isPlaying){
+      playIcon.style.display  = isPlaying ? 'none' : 'block';
+      pauseIcon.style.display = isPlaying ? 'block' : 'none';
+      btn.setAttribute('aria-label', isPlaying ? 'Pozastavit' : 'Přehrát');
+    }
+
+    // kliknutí – přehrát / pauza
+    btn.addEventListener('click', () => {
+      if (audio.paused){
+        audio.play();
+        toggleIcons(true);
+      } else {
+        audio.pause();
+        toggleIcons(false);
+      }
+    });
+
+    // když skladba sama doběhne, vrať ikonu zpět na Play
+    audio.addEventListener('ended', () => toggleIcons(false));
+  </script>
 </body>
 </html>
