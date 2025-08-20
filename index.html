@@ -49,6 +49,10 @@
     .modal h2 { margin:0 0 8px; font-size:18px; }
     .kbd { background:#0b0e14; border:1px solid #1b2230; border-radius:6px; padding:1px 5px; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#9aa4b2; }
     .hint { font-size:12px; color:#9aa4b2; }
+
+    /* volby pro BG video */
+    #bgOptions { display:none; align-items:center; gap:10px; margin-top:8px; font-size:13px; color:var(--muted); }
+    #bgOptions label { margin:0; }
   </style>
 </head>
 <body>
@@ -58,7 +62,7 @@
       <p class="lead">Vyber soubor → zadej název → zvol režim. Vygenerovaná stránka bude obsahovat jen samotné video.</p>
     </header>
 
-    <!-- HLAVNÍ FORMULÁŘ (jen 3 prvky) -->
+    <!-- HLAVNÍ FORMULÁŘ (jen 3 prvky + volba BG loop) -->
     <section class="card">
       <div class="content">
         <div>
@@ -74,6 +78,10 @@
           <div class="modes" role="radiogroup" aria-label="Režim přehrávání">
             <label class="radio"><input type="radio" name="mode" value="controls" checked> Přehrávač s ovladači</label>
             <label class="radio"><input type="radio" name="mode" value="overlay"> Jen prostřední tlačítko „Play“</label>
+            <label class="radio"><input type="radio" name="mode" value="bg-video"> Background video (autoplay · muted)</label>
+          </div>
+          <div id="bgOptions">
+            <label><input id="bgLoop" type="checkbox" checked> Smyčka (loop)</label>
           </div>
         </div>
         <div class="actions" style="margin-top:12px;">
@@ -223,9 +231,22 @@ function pageWithControls(src, kind, mime){
   </head><body>${tag}</body></html>`;
 }
 
-function buildPlayerPage({ mediaRelPath, kind, mime, mode }){
+function pageBackgroundVideo(src, loop){
+  return `<!doctype html><html lang="cs"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Media</title>
+  <style>
+    html,body{height:100%}body{margin:0;background:#000}
+    video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#000}
+  </style></head><body>
+  <video autoplay muted playsinline ${loop ? 'loop' : ''}><source src="${src}"></video>
+  </body></html>`;
+}
+
+function buildPlayerPage({ mediaRelPath, kind, mime, mode, bgLoop }){
   const src = mediaRelPath;
   if (mode === 'overlay') return pageOverlayPlay(src, kind, mime);
+  if (mode === 'bg-video') return pageBackgroundVideo(src, !!bgLoop);
   return pageWithControls(src, kind, mime); // default controls
 }
 
@@ -259,6 +280,11 @@ function getToken(){ return localStorage.getItem(LS_TOKEN_KEY) || ''; }
 function openAuth(){ const b = $("authBackdrop"); b.style.display = 'flex'; $("patInput").focus(); }
 function closeAuth(){ const b = $("authBackdrop"); b.style.display = 'none'; }
 
+function syncBgOptions(){
+  const mode = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
+  $("bgOptions").style.display = mode === 'bg-video' ? 'flex' : 'none';
+}
+
 async function run(){
   clearStatus();
   try{
@@ -268,8 +294,13 @@ async function run(){
 
     const title = $("title").value.trim() || file.name.replace(/\.[^.]+$/, '');
     const modeSel = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
+    const bgLoop = $("bgLoop").checked;
     const kind = detectKind(file);
     if (!kind) throw new Error('Neznámý typ – použij video/* nebo audio/* soubor.');
+
+    if (modeSel === 'bg-video' && kind !== 'video'){
+      throw new Error('Režim „Background video“ je k dispozici pouze pro video soubory.');
+    }
 
     if (needToken()) { pendingAction = run; openAuth(); log('Je potřeba vložit GitHub token (PAT).'); return; }
     const token = getToken();
@@ -291,10 +322,10 @@ async function run(){
 
     const relToPage = `../${mediaPath.replace(/^\/+/, '')}`;
     const mime = mimeFrom(file);
-    const html = buildPlayerPage({ mediaRelPath: relToPage, kind, mime, mode: modeSel });
+    const html = buildPlayerPage({ mediaRelPath: relToPage, kind, mime, mode: modeSel, bgLoop });
     const htmlB64 = utf8ToBase64(html);
 
-    log(`🛠️  Generuji stránku (${modeSel}) → <span class="mono">${pagePath}</span>`);
+    log(`🛠️  Generuji stránku (${modeSel}${modeSel==='bg-video' ? (bgLoop?' · loop':' · no-loop') : ''}) → <span class="mono">${pagePath}</span>`);
     await githubPutFile({ path: pagePath, contentBase64: htmlB64, message: `Create player page: ${slug}.html`, token });
     log('<strong class="ok">✓ Stránka vytvořena.</strong>');
 
@@ -347,10 +378,12 @@ $("savePat").addEventListener('click', ()=>{
 });
 $("cancelPat").addEventListener('click', ()=>{ closeAuth(); pendingAction = null; });
 
-// Otevři modal přes hash #token, smaž token přes ?logout; na start načti seznam
+// Otevři modal přes hash #token, smaž token přes ?logout; na start načti seznam a synchronizuj volby
 window.addEventListener('DOMContentLoaded', ()=>{
   if (location.search.includes('logout')) { localStorage.removeItem(LS_TOKEN_KEY); }
   if (location.hash === '#token' || needToken()) { openAuth(); }
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', syncBgOptions));
+  syncBgOptions();
   doList();
 });
 </script>
