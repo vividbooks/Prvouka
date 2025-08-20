@@ -3,56 +3,57 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GitHub Media Uploader → jednoduchá stránka</title>
-  <meta name="description" content="Vyber soubor, zadej název, zvol režim přehrávání. Nahraje do GitHubu a vygeneruje stránku, která zobrazuje jen samotné video (bez nadpisu a textů)." />
+  <title>GitHub Media Uploader → světlé UI</title>
+  <meta name="description" content="Vyber soubor, zadej název, zvol režim přehrávání. Nahraje do GitHubu a vygeneruje čistou stránku s videem/audio. Background video lze nastavit na contain/cover, loop a barvu pozadí. Vytvořenou stránku lze později upravit přes malé nastavení přímo na stránce." />
   <style>
     :root {
-      --bg: #0b0c10; --panel: #111319; --muted: #9aa4b2; --text: #e8eef7;
-      --acc: #5aa9ff; --acc-2: #3fd3a5; --danger: #ff6b6b; --radius: 16px;
+      --bg: #f6f8fb; --surface: #ffffff; --muted: #5b6777; --text: #0f172a;
+      --border: #e6eaf0; --acc: #2563eb; --acc-2: #10b981; --danger: #ef4444; --radius: 14px;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-    body { margin: 0; background: linear-gradient(180deg, #0b0c10, #0e1016 40%, #0b0c10); color: var(--text); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 28px 18px 80px; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
+    .wrap { max-width: 940px; margin: 0 auto; padding: 28px 18px 80px; }
     header { display: grid; gap: 6px; margin-bottom: 14px; }
-    h1 { font-size: 22px; margin: 0; }
+    h1 { font-size: 24px; margin: 0; letter-spacing: .2px; }
     p.lead { margin: 0; color: var(--muted); }
 
-    .card { background: linear-gradient(180deg, #10131a, #0c0f15); border: 1px solid #1b2230; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 22px rgba(16,24,40,.04); }
     .card + .card { margin-top: 14px; }
     .content { padding: 16px; }
 
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-    input[type="text"], input[type="file"] { width:100%; background:#0a0d13; color:var(--text); border:1px solid #1c2433; border-radius:12px; padding:12px; }
+    input[type="text"], input[type="file"], input[type="color"] { width:100%; background:#fff; color:var(--text); border:1px solid var(--border); border-radius:12px; padding:12px; }
+    input[type="color"] { padding: 6px; height: 40px; }
 
     .modes { display:flex; gap:10px; flex-wrap:wrap; }
-    .radio { display:flex; align-items:center; gap:8px; background:#0b0e14; border:1px solid #1b2230; padding:8px 10px; border-radius:10px; }
+    .radio { display:flex; align-items:center; gap:8px; background:#f7f9fc; border:1px solid var(--border); padding:8px 10px; border-radius:10px; }
 
     .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    button { appearance:none; border:0; cursor:pointer; color:#0b0c10; background:var(--acc); padding:12px 16px; border-radius:12px; font-weight:650; box-shadow:0 8px 18px rgba(90,169,255,.22); }
-    button.sec { background:#1a2332; color:var(--text); box-shadow:none; border:1px solid #222c3e; }
-    button.ghost { background:transparent; color:var(--text); border:1px dashed #273247; box-shadow:none; }
+    button { appearance:none; border:0; cursor:pointer; color:#fff; background:var(--acc); padding:12px 16px; border-radius:12px; font-weight:650; box-shadow:0 8px 18px rgba(37,99,235,.18); }
+    button.sec { background:#eef2ff; color:#1e293b; box-shadow:none; border:1px solid var(--border); }
+    button.ghost { background:transparent; color:#1e293b; border:1px dashed var(--border); box-shadow:none; }
 
-    .status { font-size:14px; color:var(--muted); white-space:pre-wrap; border-top:1px dashed #1f293d; padding-top:10px; margin-top:6px; }
+    .status { font-size:14px; color:#334155; white-space:pre-wrap; border-top:1px dashed var(--border); padding-top:10px; margin-top:6px; }
     .ok { color: var(--acc-2); }
     .err { color: var(--danger); }
 
     .list { display:grid; gap:8px; }
-    .item { display:flex; align-items:center; justify-content:space-between; background:#0b0e14; border:1px solid #1b2230; border-radius:12px; padding:10px 12px; }
+    .item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .item a { color: var(--text); text-decoration: none; }
     .item small { color: var(--muted); }
 
     /* Modal pro zadání PAT (jen když chybí) */
-    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:999; }
-    .modal { width:min(560px, 100%); background:#0f1219; border:1px solid #1b2230; border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,.45); }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; padding:16px; z-index:999; }
+    .modal { width:min(560px, 100%); background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow:0 18px 50px rgba(16,24,40,.12); color: var(--text); }
     .modal .content { padding:18px; }
     .modal h2 { margin:0 0 8px; font-size:18px; }
-    .kbd { background:#0b0e14; border:1px solid #1b2230; border-radius:6px; padding:1px 5px; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#9aa4b2; }
-    .hint { font-size:12px; color:#9aa4b2; }
+    .kbd { background:#eef2ff; border:1px solid var(--border); border-radius:6px; padding:1px 5px; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#334155; }
+    .hint { font-size:12px; color:#475569; }
 
     /* volby pro BG video */
-    #bgOptions { display:none; flex-direction:column; gap:8px; margin-top:8px; font-size:13px; color:var(--muted); }
-    #bgOptions .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    #bgOptions { display:none; flex-direction:column; gap:10px; margin-top:10px; font-size:13px; color:#334155; background:#f7f9fc; border:1px dashed var(--border); padding:10px; border-radius:12px; }
+    #bgOptions .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     #bgOptions label { margin:0; }
   </style>
 </head>
@@ -60,10 +61,10 @@
   <div class="wrap">
     <header>
       <h1>GitHub Media Uploader</h1>
-      <p class="lead">Vyber soubor → zadej název → zvol režim. Vygenerovaná stránka bude obsahovat jen samotné video.</p>
+      <p class="lead">Vyber soubor → zadej název → zvol režim. Vygenerovaná stránka ukáže jen samotné video/audio. BG video lze změnit i dodatečně.</p>
     </header>
 
-    <!-- HLAVNÍ FORMULÁŘ (jen 3 prvky + volby BG) -->
+    <!-- HLAVNÍ FORMULÁŘ (soubor, název, režim + volby BG) -->
     <section class="card">
       <div class="content">
         <div>
@@ -90,6 +91,10 @@
               <label class="radio"><input type="radio" name="bgFit" value="contain" checked> Přizpůsobit (bez ořezu)</label>
               <label class="radio"><input type="radio" name="bgFit" value="cover"> Vyplnit (může oříznout)</label>
             </div>
+            <div id="bgColorWrap" class="row">
+              <span class="hint">Barva pozadí (pro „Přizpůsobit“):</span>
+              <input id="bgColor" type="color" value="#000000" title="Barva pozadí za videem" />
+            </div>
           </div>
         </div>
         <div class="actions" style="margin-top:12px;">
@@ -114,7 +119,7 @@
     <div class="modal">
       <div class="content">
         <h2 id="authTitle">Přihlášení k GitHubu (PAT)</h2>
-        <p class="hint">Vlož <strong>Personal Access Token</strong> s oprávněním <span class="kbd">contents:write</span>. Token se uloží jen do <em>localStorage</em>.</p>
+        <p class="hint">Vlož <strong>Personal Access Token</strong> s oprávněním <span class="kbd">contents:write</span>. Token se uloží jen do <em>localStorage</em> na této doméně.</p>
         <div style="margin-top:8px;">
           <label>GitHub token (PAT)</label>
           <input id="patInput" type="password" placeholder="token začínající github_pat_…" />
@@ -239,23 +244,76 @@ function pageWithControls(src, kind, mime){
   </head><body>${tag}</body></html>`;
 }
 
-function pageBackgroundVideo(src, loop, fit){
-  const fitCss = (fit === 'cover') ? 'cover' : 'contain'; // default contain = bez ořezu
+function pageBackgroundVideo({ src, loop, fit, bgColor, owner, repo, branch, pagePath }){
+  const fitCss = (fit === 'cover') ? 'cover' : 'contain';
+  const bg = /^#([0-9a-f]{3}){1,2}$/i.test(bgColor||'') ? bgColor : '#000000';
+  const esc = (s)=>String(s).replace(/`/g,'\\`');
   return `<!doctype html><html lang=\"cs\"><head>
   <meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>Media</title>
   <style>
-    html,body{height:100%}body{margin:0;background:#000;overflow:hidden}
-    video{position:fixed;inset:0;width:100vw;height:100vh;object-fit:${fitCss};object-position:center center;display:block;background:#000}
+    html,body{height:100%}body{margin:0;background:${bg};overflow:hidden}
+    video{position:fixed;inset:0;width:100vw;height:100vh;object-fit:${fitCss};object-position:center center;display:block;background:${bg}}
+    .gear{position:fixed;top:12px;right:12px;width:40px;height:40px;border-radius:10px;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font:16px/1 system-ui;backdrop-filter:saturate(1.1) blur(6px)}
+    .gear:hover{background:rgba(0,0,0,.55)}
+    .panel{position:fixed;inset:auto 12px 12px auto;width:min(360px,calc(100vw-24px));background:#0b1220;color:#e5f0ff;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.45);display:none}
+    .panel .c{padding:14px}
+    .panel label{font:12px/1.2 system-ui;color:#a8c7ff;display:block;margin:8px 0 4px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .panel input[type=color]{width:100%;height:40px;border:0;border-radius:10px}
+    .actions{display:flex;gap:8px;margin-top:10px}
+    .btn{appearance:none;border:0;border-radius:10px;padding:10px 12px;cursor:pointer}
+    .btn.p{background:#3b82f6;color:#fff}
+    .btn.s{background:#1f2937;color:#e5e7eb}
   </style></head><body>
-  <video autoplay muted playsinline ${loop ? 'loop' : ''}><source src=\"${src}\"></video>
+  <video id=\"v\" autoplay muted playsinline ${loop ? 'loop' : ''}><source src=\"${src}\"></video>
+  <div id=\"gear\" class=\"gear\" title=\"Upravit nastavení\">⚙︎</div>
+  <div id=\"panel\" class=\"panel\"><div class=\"c\">
+    <div class=\"row\"><strong style=\"font-size:14px\">Nastavení stránky</strong></div>
+    <label>Režim vyplnění</label>
+    <div class=\"row\">
+      <label class=\"row\"><input type=\"radio\" name=\"fit\" value=\"contain\" ${fitCss==='contain'?'checked':''}> Přizpůsobit (bez ořezu)</label>
+      <label class=\"row\"><input type=\"radio\" name=\"fit\" value=\"cover\" ${fitCss==='cover'?'checked':''}> Vyplnit (může oříznout)</label>
+    </div>
+    <label>Smyčka</label>
+    <div class=\"row\"><input id=\"loop\" type=\"checkbox\" ${loop?'checked':''}> Loop</div>
+    <label>Barva pozadí (contain)</label>
+    <input id=\"bg\" type=\"color\" value=\"${bg}\">
+    <div class=\"actions\">
+      <button id=\"save\" class=\"btn p\">Uložit</button>
+      <button id=\"close\" class=\"btn s\">Zavřít</button>
+    </div>
+    <div id=\"msg\" style=\"font:12px/1.4 system-ui;color:#a8c7ff;margin-top:8px\"></div>
+  </div></div>
+  <script>
+    const CFG = { owner: ${JSON.stringify(owner)}, repo: ${JSON.stringify(repo)}, branch: ${JSON.stringify(branch)}, path: ${JSON.stringify(pagePath)}, tokenKey: 'gh_pat_media_uploader' };
+    const q = (s)=>document.querySelector(s);
+    const show = (el,b)=>el.style.display=b?'block':'none';
+    const gear = q('#gear');
+    const panel = q('#panel');
+    gear.addEventListener('click', ()=> show(panel, panel.style.display!=='block'));
+    q('#close').addEventListener('click', ()=> show(panel,false));
+
+    function base64(s){ return btoa(unescape(encodeURIComponent(s))); }
+    async function getSha(){
+      const url = `https://api.github.com/repos/${'${'}CFG.owner}/$${'{'}CFG.repo}/contents/${'${'}CFG.path}?ref=${'${'}CFG.branch}`;
+      const r = await fetch(url,{ headers:{ 'Accept':'application/vnd.github+json','Authorization':`token ${'${'}localStorage.getItem(CFG.tokenKey)||''}`}});
+      if(!r.ok) throw new Error('GET sha '+r.status);
+      return (await r.json()).sha;
+    }
+    function build(loop,fit,bg){
+      const f = (fit==='cover')?'cover':'contain';
+      return `<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>Media</title><style>html,body{height:100%}body{margin:0;background:${'${'}bg};overflow:hidden}video{position:fixed;inset:0;width:100vw;height:100vh;object-fit:${'${'}f};object-position:center center;display:block;background:${'${'}bg}}.gear{position:fixed;top:12px;right:12px;width:40px;height:40px;border-radius:10px;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font:16px/1 system-ui;backdrop-filter:saturate(1.1) blur(6px)}.gear:hover{background:rgba(0,0,0,.55)}.panel{position:fixed;inset:auto 12px 12px auto;width:min(360px,calc(100vw-24px));background:#0b1220;color:#e5f0ff;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.45);display:none}.panel .c{padding:14px}.panel label{font:12px/1.2 system-ui;color:#a8c7ff;display:block;margin:8px 0 4px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.panel input[type=color]{width:100%;height:40px;border:0;border-radius:10px}.actions{display:flex;gap:8px;margin-top:10px}.btn{appearance:none;border:0;border-radius:10px;padding:10px 12px;cursor:pointer}.btn.p{background:#3b82f6;color:#fff}.btn.s{background:#1f2937;color:#e5e7eb}</style></head><body><video id=\"v\" autoplay muted playsinline ${'${'}loop?'loop':''}><source src=\"${esc(src)}\"></video><div id=\"gear\" class=\"gear\" title=\"Upravit nastavení\">⚙︎</div><div id=\"panel\" class=\"panel\"><div class=\"c\"><div class=\"row\"><strong style=\"font-size:14px\">Nastavení stránky</strong></div><label>Režim vyplnění</label><div class=\"row\"><label class=\"row\"><input type=\"radio\" name=\"fit\" value=\"contain\" ${'${'}f==='contain'?'checked':''}> Přizpůsobit (bez ořezu)</label><label class=\"row\"><input type=\"radio\" name=\"fit\" value=\"cover\" ${'${'}f==='cover'?'checked':''}> Vyplnit (může oříznout)</label></div><label>Smyčka</label><div class=\"row\"><input id=\"loop\" type=\"checkbox\" ${'${'}loop?'checked':''}> Loop</div><label>Barva pozadí (contain)</label><input id=\"bg\" type=\"color\" value=\"${'${'}bg}\"><div class=\"actions\"><button id=\"save\" class=\"btn p\">Uložit</button><button id=\"close\" class=\"btn s\">Zavřít</button></div><div id=\"msg\" style=\"font:12px/1.4 system-ui;color:#a8c7ff;margin-top:8px\"></div></div></div><script>const CFG={owner:${JSON.stringify(owner)},repo:${JSON.stringify(repo)},branch:${JSON.stringify(branch)},path:${JSON.stringify(pagePath)},tokenKey:'gh_pat_media_uploader'};const q=(s)=>document.querySelector(s);const show=(el,b)=>el.style.display=b?'block':'none';const gear=q('#gear');const panel=q('#panel');gear.addEventListener('click',()=>show(panel,panel.style.display!=='block'));q('#close').addEventListener('click',()=>show(panel,false));function base64(s){return btoa(unescape(encodeURIComponent(s)));}async function getSha(){const url=`https://api.github.com/repos/${'${'}CFG.owner}/$${'{'}CFG.repo}/contents/${'${'}CFG.path}?ref=${'${'}CFG.branch}`;const r=await fetch(url,{headers:{'Accept':'application/vnd.github+json','Authorization':`token ${'${'}localStorage.getItem(CFG.tokenKey)||''}`}});if(!r.ok)throw new Error('GET sha '+r.status);return (await r.json()).sha;}q('#save').addEventListener('click',async()=>{const fit=q('input[name=fit]:checked').value;const loop=q('#loop').checked;const bg=q('#bg').value;const token=localStorage.getItem(CFG.tokenKey)||'';if(!token){alert('Chybí PAT token. Otevři hlavní uploader stránku s #token a vlož jej.');return;}q('#msg').textContent='Ukládám…';try{const sha=await getSha();const html=build(loop,fit,bg);const url=`https://api.github.com/repos/${'${'}CFG.owner}/$${'{'}CFG.repo}/contents/${'${'}CFG.path}`;const res=await fetch(url,{method:'PUT',headers:{'Accept':'application/vnd.github+json','Authorization':`token ${'${'}token}`,'Content-Type':'application/json'},body:JSON.stringify({message:'Update player settings',content:base64(html),branch:CFG.branch,sha})});if(!res.ok)throw new Error(await res.text());q('#msg').textContent='Uloženo. Nasazení Pages může chvíli trvat.';}catch(e){q('#msg').textContent='Chyba: '+e.message;}});<\/script></body></html>`;
+    }
+    q('#save').addEventListener('click', async ()=>{ /* handled in injected script above */ });
+  <\/script>
   </body></html>`;
 }
 
-function buildPlayerPage({ mediaRelPath, kind, mime, mode, bgLoop, bgFit }){
+function buildPlayerPage({ mediaRelPath, kind, mime, mode, bgLoop, bgFit, bgColor, pagePath }){
   const src = mediaRelPath;
   if (mode === 'overlay') return pageOverlayPlay(src, kind, mime);
-  if (mode === 'bg-video') return pageBackgroundVideo(src, !!bgLoop, bgFit || 'contain');
+  if (mode === 'bg-video') return pageBackgroundVideo({ src, loop: !!bgLoop, fit: bgFit || 'contain', bgColor: bgColor || '#000000', owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, pagePath });
   return pageWithControls(src, kind, mime); // default controls
 }
 
@@ -291,7 +349,10 @@ function closeAuth(){ const b = $("authBackdrop"); b.style.display = 'none'; }
 
 function syncBgOptions(){
   const mode = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
-  $("bgOptions").style.display = mode === 'bg-video' ? 'flex' : 'none';
+  const bgBox = $("bgOptions");
+  bgBox.style.display = mode === 'bg-video' ? 'flex' : 'none';
+  const fit = (document.querySelector('input[name="bgFit"]:checked')?.value) || 'contain';
+  $("bgColorWrap").style.display = mode==='bg-video' && fit==='contain' ? 'flex' : 'none';
 }
 
 async function run(){
@@ -305,6 +366,7 @@ async function run(){
     const modeSel = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
     const bgLoop = $("bgLoop").checked;
     const bgFit  = (document.querySelector('input[name="bgFit"]:checked')?.value) || 'contain';
+    const bgColor = $("bgColor").value || '#000000';
     const kind = detectKind(file);
     if (!kind) throw new Error('Neznámý typ – použij video/* nebo audio/* soubor.');
 
@@ -332,7 +394,7 @@ async function run(){
 
     const relToPage = `../${mediaPath.replace(/^\/+/, '')}`;
     const mime = mimeFrom(file);
-    const html = buildPlayerPage({ mediaRelPath: relToPage, kind, mime, mode: modeSel, bgLoop, bgFit });
+    const html = buildPlayerPage({ mediaRelPath: relToPage, kind, mime, mode: modeSel, bgLoop, bgFit, bgColor, pagePath });
     const htmlB64 = utf8ToBase64(html);
 
     log(`🛠️  Generuji stránku (${modeSel}${modeSel==='bg-video' ? (bgLoop?' · loop':' · no-loop') + ' · ' + bgFit : ''}) → <span class="mono">${pagePath}</span>`);
@@ -392,6 +454,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   if (location.search.includes('logout')) { localStorage.removeItem(LS_TOKEN_KEY); }
   if (location.hash === '#token' || needToken()) { openAuth(); }
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', syncBgOptions));
+  document.querySelectorAll('input[name="bgFit"]').forEach(r => r.addEventListener('change', syncBgOptions));
   syncBgOptions();
   doList();
 });
