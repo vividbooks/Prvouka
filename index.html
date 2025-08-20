@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GitHub Media Uploader → jednoduchá stránka</title>
-  <meta name="description" content="Vyber soubor, zadej název, zvol režim přehrávání. Nahraje do GitHubu a vygeneruje čistou přehrávací stránku (controls / background)." />
+  <meta name="description" content="Vyber soubor, zadej název, zvol režim přehrávání. Nahraje do GitHubu a vygeneruje stránku, která zobrazuje jen samotné video (bez nadpisu a textů)." />
   <style>
     :root {
       --bg: #0b0c10; --panel: #111319; --muted: #9aa4b2; --text: #e8eef7;
@@ -23,8 +23,7 @@
     .content { padding: 16px; }
 
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-    input[type="text"], input[type="file"], textarea { width:100%; background:#0a0d13; color:var(--text); border:1px solid #1c2433; border-radius:12px; padding:12px; }
-    textarea { min-height: 70px; resize: vertical; }
+    input[type="text"], input[type="file"] { width:100%; background:#0a0d13; color:var(--text); border:1px solid #1c2433; border-radius:12px; padding:12px; }
 
     .modes { display:flex; gap:10px; flex-wrap:wrap; }
     .radio { display:flex; align-items:center; gap:8px; background:#0b0e14; border:1px solid #1b2230; padding:8px 10px; border-radius:10px; }
@@ -56,7 +55,7 @@
   <div class="wrap">
     <header>
       <h1>GitHub Media Uploader</h1>
-      <p class="lead">Vyber soubor → zadej název → zvol režim. O vše ostatní se postará skript (nahrání do GitHubu, vytvoření přehrávací stránky).</p>
+      <p class="lead">Vyber soubor → zadej název → zvol režim. Vygenerovaná stránka bude obsahovat jen samotné video.</p>
     </header>
 
     <!-- HLAVNÍ FORMULÁŘ (jen 3 prvky) -->
@@ -68,14 +67,13 @@
         </div>
         <div style="margin-top:10px;">
           <label>Název (pro stránku)</label>
-          <input id="title" type="text" placeholder="Např. Záznam webináře – Matematika" />
+          <input id="title" type="text" placeholder="Např. Prvouka – video 01" />
         </div>
         <div style="margin-top:10px;">
           <label>Režim přehrávání</label>
           <div class="modes" role="radiogroup" aria-label="Režim přehrávání">
-            <label class="radio"><input type="radio" name="mode" value="controls" checked> S ovladači (standard)</label>
-            <label class="radio"><input type="radio" name="mode" value="bg-video"> Background video (autoplay · muted · loop)</label>
-            <label class="radio"><input type="radio" name="mode" value="bg-audio"> Background audio (autoplay · loop)</label>
+            <label class="radio"><input type="radio" name="mode" value="controls" checked> Přehrávač s ovladači</label>
+            <label class="radio"><input type="radio" name="mode" value="overlay"> Jen prostřední tlačítko „Play“</label>
           </div>
         </div>
         <div class="actions" style="margin-top:12px;">
@@ -100,7 +98,7 @@
     <div class="modal">
       <div class="content">
         <h2 id="authTitle">Přihlášení k GitHubu (PAT)</h2>
-        <p class="hint">Vlož <strong>Personal Access Token</strong> s oprávněním <span class="kbd">contents:write</span> pro vybraný repozitář. Token se uloží jen do <em>localStorage</em> v tomto prohlížeči a lze jej kdykoliv smazat.</p>
+        <p class="hint">Vlož <strong>Personal Access Token</strong> s oprávněním <span class="kbd">contents:write</span>. Token se uloží jen do <em>localStorage</em>.</p>
         <div style="margin-top:8px;">
           <label>GitHub token (PAT)</label>
           <input id="patInput" type="password" placeholder="token začínající github_pat_…" />
@@ -178,119 +176,57 @@ async function fileToBase64(file){
   });
 }
 
-function utf8ToBase64(str){
-  return btoa(unescape(encodeURIComponent(str)));
+function utf8ToBase64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function buildDefaultBase(){ return `https://${GH_OWNER}.github.io/${GH_REPO}/`; }
+
+// === ŠABLONY STRÁNEK (pouze video/audio, bez titulků) ===
+function pageOverlayPlay(src, kind, mime){
+  const mediaTag = (kind === 'video')
+    ? `<video class="v" playsinline><source src="${src}" type="${mime}"></video>`
+    : `<audio class="a"><source src="${src}" type="${mime}"></audio>`;
+
+  return `<!doctype html><html lang="cs"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Media</title>
+  <style>
+    html,body{height:100%}body{margin:0;background:#000;color:#fff;font:16px system-ui;display:flex;align-items:center;justify-content:center}
+    .wrap{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+    .v{max-width:100%;max-height:100%;object-fit:contain;display:block}
+    .play{position:absolute;width:96px;height:96px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .play:hover{background:rgba(0,0,0,.75)}
+    .play:before{content:'';display:block;margin-left:6px;border-left:30px solid #fff;border-top:18px solid transparent;border-bottom:18px solid transparent}
+  </style></head><body>
+  <div class="wrap">
+    ${mediaTag}
+    <div class="play" id="btn"></div>
+  </div>
+  <script>
+    const k = ${JSON.stringify(kind)};
+    const btn = document.getElementById('btn');
+    const el = document.querySelector(k==='video'?'.v':'.a');
+    btn.addEventListener('click', ()=>{ el.play(); btn.style.display='none'; });
+    if(k==='video') el.addEventListener('pause', ()=>{ btn.style.display='flex'; });
+    if(k==='video') el.addEventListener('play', ()=>{ btn.style.display='none'; });
+    el.addEventListener('ended', ()=>{ btn.style.display='flex'; });
+  <\/script>
+  </body></html>`;
 }
 
-function buildDefaultBase(){
-  return `https://${GH_OWNER}.github.io/${GH_REPO}/`;
+function pageWithControls(src, kind, mime){
+  const tag = (kind === 'video')
+    ? `<video controls playsinline style="max-width:100%;max-height:100vh;display:block;margin:0 auto;background:#000"><source src="${src}" type="${mime}"></video>`
+    : `<audio controls style="width:100%;display:block;margin:20px auto"><source src="${src}" type="${mime}"></audio>`;
+  return `<!doctype html><html lang="cs"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Media</title>
+  <style>body{margin:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
+  </head><body>${tag}</body></html>`;
 }
 
-function playerPageHTML({ title, description, mediaRelPath, kind, mime, mode, bg = '#0b0c10' }){
-  const safeTitle = title || 'Media';
+function buildPlayerPage({ mediaRelPath, kind, mime, mode }){
   const src = mediaRelPath;
-
-  if (mode === 'bg-video') {
-    return `<!doctype html>
-<html lang="cs">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${safeTitle}</title>
-  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
-  <style>
-    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#000;color:#fff;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .video-bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
-    .overlay{position:relative;min-height:100vh;display:flex;align-items:flex-end}
-    .panel{width:100%;padding:24px;background:linear-gradient(180deg,transparent 0%, rgba(0,0,0,.5) 40%, rgba(0,0,0,.8) 100%)}
-    .card{max-width:980px;margin:0 auto;background:rgba(0,0,0,.35);backdrop-filter:saturate(1.2) blur(6px);border:1px solid rgba(255,255,255,.12);border-radius:16px}
-    .content{padding:18px}
-    h1{margin:0 0 8px;font-size:22px}
-    p{margin:0 0 12px;color:#cbd5e1}
-    a{color:#a8c7ff}
-  </style>
-</head>
-<body>
-  <video class="video-bg" src="${src}" autoplay muted loop playsinline></video>
-  <div class="overlay"><div class="panel"><div class="card"><div class="content">
-    <h1>${safeTitle}</h1>
-    ${description ? `<p>${description}</p>` : ''}
-    <p><a href="${src}" download>Stáhnout soubor</a></p>
-  </div></div></div></div>
-</body>
-</html>`;
-  }
-
-  if (mode === 'bg-audio') {
-    return `<!doctype html>
-<html lang="cs">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${safeTitle}</title>
-  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
-  <style>
-    :root{ --bg:${bg}; --text:#e8eef7; --muted:#9aa4b2; --panel:#111319; }
-    *{box-sizing:border-box}html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    .card{background:linear-gradient(180deg,#10131a,#0c0f15);border:1px solid #1b2230;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .content{padding:18px}
-    h1{margin:0 0 8px;font-size:22px}
-    p{margin:0 0 12px;color:var(--muted)}
-    a{color:#5aa9ff}
-    .note{font-size:12px;color:#9aa4b2}
-  </style>
-</head>
-<body>
-  <audio src="${src}" autoplay loop></audio>
-  <div class="wrap"><div class="card"><div class="content">
-    <h1>${safeTitle}</h1>
-    ${description ? `<p>${description}</p>` : ''}
-    <p class="note">Audio se přehrává na pozadí (bez ovladačů). Některé prohlížeče mohou vyžadovat interakci.</p>
-    <p><a href="${src}" download>Stáhnout soubor</a></p>
-  </div></div></div>
-</body>
-</html>`;
-  }
-
-  const mediaTag = kind === 'video'
-    ? `<video controls playsinline preload="metadata" style="width:100%;height:auto;border-radius:16px;display:block;background:#000">
-         <source src="${src}" type="${mime}">Váš prohlížeč nepodporuje HTML5 video. <a href="${src}">Stáhnout</a>.
-       </video>`
-    : `<audio controls preload="metadata" style="width:100%;display:block">
-         <source src="${src}" type="${mime}">Váš prohlížeč nepodporuje HTML5 audio. <a href="${src}">Stáhnout</a>.
-       </audio>`;
-
-  return `<!doctype html>
-<html lang="cs">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${safeTitle}</title>
-  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
-  <style>
-    :root{ --bg:${bg}; --text:#e8eef7; --muted:#9aa4b2; --panel:#111319; }
-    *{box-sizing:border-box}html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    .card{background:linear-gradient(180deg,#10131a,#0c0f15);border:1px solid #1b2230;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .content{padding:18px}
-    h1{margin:0 0 8px;font-size:22px}
-    p{margin:0 0 12px;color:var(--muted)}
-    .player{padding:8px}
-    a{color:#5aa9ff}
-  </style>
-</head>
-<body>
-  <div class="wrap"><div class="card"><div class="content">
-    <h1>${safeTitle}</h1>
-    ${description ? `<p>${description}</p>` : ''}
-    <div class="player">${mediaTag}</div>
-    <p><a href="${src}" download>Stáhnout soubor</a></p>
-  </div></div></div>
-</body>
-</html>`;
+  if (mode === 'overlay') return pageOverlayPlay(src, kind, mime);
+  return pageWithControls(src, kind, mime); // default controls
 }
 
 async function githubPutFile({ path, contentBase64, message, token }){
@@ -318,9 +254,6 @@ async function githubListFolder({ path, token }){
 }
 
 function getBaseUrl(){ return (GH_PAGES_BASE || buildDefaultBase()).replace(/\/$/, '') + '/'; }
-
-function required(v, name){ if(!v){ throw new Error(`Chybí: ${name}`); } return v; }
-
 function needToken(){ return !localStorage.getItem(LS_TOKEN_KEY); }
 function getToken(){ return localStorage.getItem(LS_TOKEN_KEY) || ''; }
 function openAuth(){ const b = $("authBackdrop"); b.style.display = 'flex'; $("patInput").focus(); }
@@ -334,17 +267,12 @@ async function run(){
     if (file.size > GH_SIZE_LIMIT_MB * 1024 * 1024) throw new Error(`Soubor je větší než ${GH_SIZE_LIMIT_MB} MB. Zvaž Git LFS.`);
 
     const title = $("title").value.trim() || file.name.replace(/\.[^.]+$/, '');
-    const description = '';
     const modeSel = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
     const kind = detectKind(file);
     if (!kind) throw new Error('Neznámý typ – použij video/* nebo audio/* soubor.');
 
     if (needToken()) { pendingAction = run; openAuth(); log('Je potřeba vložit GitHub token (PAT).'); return; }
     const token = getToken();
-
-    let finalMode = modeSel;
-    if (modeSel === 'bg-video' && kind !== 'video') { finalMode = 'bg-audio'; log('ℹ️ Vybráno background video, ale soubor je audio → použiji background audio.'); }
-    if (modeSel === 'bg-audio' && kind !== 'audio') { finalMode = 'bg-video'; log('ℹ️ Vybráno background audio, ale soubor je video → použiji background video.'); }
 
     const slug = slugify(title || file.name) + '-' + nowStamp();
     const ext = (file.name.split('.').pop() || '').toLowerCase();
@@ -363,10 +291,10 @@ async function run(){
 
     const relToPage = `../${mediaPath.replace(/^\/+/, '')}`;
     const mime = mimeFrom(file);
-    const html = playerPageHTML({ title, description, mediaRelPath: relToPage, kind, mime, mode: finalMode });
+    const html = buildPlayerPage({ mediaRelPath: relToPage, kind, mime, mode: modeSel });
     const htmlB64 = utf8ToBase64(html);
 
-    log(`🛠️  Generuji stránku (${finalMode}) → <span class="mono">${pagePath}</span>`);
+    log(`🛠️  Generuji stránku (${modeSel}) → <span class="mono">${pagePath}</span>`);
     await githubPutFile({ path: pagePath, contentBase64: htmlB64, message: `Create player page: ${slug}.html`, token });
     log('<strong class="ok">✓ Stránka vytvořena.</strong>');
 
@@ -391,7 +319,7 @@ async function doList(){
   clearStatus();
   try{
     log('📄 Načítám seznam stránek…');
-    const token = getToken(); // volitelné – pro veřejné repo není nutné
+    const token = getToken(); // volitelné – pro soukromé repo nutné
     const items = await githubListFolder({ path: FOLDER_PAGES, token });
     const htmls = items.filter(x => x.type === 'file' && x.name.endsWith('.html'));
     $("items").innerHTML = '';
@@ -419,7 +347,7 @@ $("savePat").addEventListener('click', ()=>{
 });
 $("cancelPat").addEventListener('click', ()=>{ closeAuth(); pendingAction = null; });
 
-// Otevři modal přes hash #token, smaž token přes ?logout
+// Otevři modal přes hash #token, smaž token přes ?logout; na start načti seznam
 window.addEventListener('DOMContentLoaded', ()=>{
   if (location.search.includes('logout')) { localStorage.removeItem(LS_TOKEN_KEY); }
   if (location.hash === '#token' || needToken()) { openAuth(); }
