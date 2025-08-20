@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitHub Media Uploader → jednoduchá stránka</title>
+  <meta name="description" content="Vyber soubor, zadej název, zvol režim přehrávání. Nahraje do GitHubu a vygeneruje čistou přehrávací stránku (controls / background)." />
+  <style>
+    :root {
+      --bg: #0b0c10; --panel: #111319; --muted: #9aa4b2; --text: #e8eef7;
+      --acc: #5aa9ff; --acc-2: #3fd3a5; --danger: #ff6b6b; --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: linear-gradient(180deg, #0b0c10, #0e1016 40%, #0b0c10); color: var(--text); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 28px 18px 80px; }
+    header { display: grid; gap: 6px; margin-bottom: 14px; }
+    h1 { font-size: 22px; margin: 0; }
+    p.lead { margin: 0; color: var(--muted); }
+
+    .card { background: linear-gradient(180deg, #10131a, #0c0f15); border: 1px solid #1b2230; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .card + .card { margin-top: 14px; }
+    .content { padding: 16px; }
+
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], input[type="file"], textarea { width:100%; background:#0a0d13; color:var(--text); border:1px solid #1c2433; border-radius:12px; padding:12px; }
+    textarea { min-height: 70px; resize: vertical; }
+
+    .modes { display:flex; gap:10px; flex-wrap:wrap; }
+    .radio { display:flex; align-items:center; gap:8px; background:#0b0e14; border:1px solid #1b2230; padding:8px 10px; border-radius:10px; }
+
+    .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    button { appearance:none; border:0; cursor:pointer; color:#0b0c10; background:var(--acc); padding:12px 16px; border-radius:12px; font-weight:650; box-shadow:0 8px 18px rgba(90,169,255,.22); }
+    button.sec { background:#1a2332; color:var(--text); box-shadow:none; border:1px solid #222c3e; }
+    button.ghost { background:transparent; color:var(--text); border:1px dashed #273247; box-shadow:none; }
+
+    .status { font-size:14px; color:var(--muted); white-space:pre-wrap; border-top:1px dashed #1f293d; padding-top:10px; margin-top:6px; }
+    .ok { color: var(--acc-2); }
+    .err { color: var(--danger); }
+
+    .list { display:grid; gap:8px; }
+    .item { display:flex; align-items:center; justify-content:space-between; background:#0b0e14; border:1px solid #1b2230; border-radius:12px; padding:10px 12px; }
+    .item a { color: var(--text); text-decoration: none; }
+    .item small { color: var(--muted); }
+
+    /* Modal pro zadání PAT (jen když chybí) */
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:999; }
+    .modal { width:min(560px, 100%); background:#0f1219; border:1px solid #1b2230; border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,.45); }
+    .modal .content { padding:18px; }
+    .modal h2 { margin:0 0 8px; font-size:18px; }
+    .kbd { background:#0b0e14; border:1px solid #1b2230; border-radius:6px; padding:1px 5px; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#9aa4b2; }
+    .hint { font-size:12px; color:#9aa4b2; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>GitHub Media Uploader</h1>
+      <p class="lead">Vyber soubor → zadej název → zvol režim. O vše ostatní se postará skript (nahrání do GitHubu, vytvoření přehrávací stránky).</p>
+    </header>
+
+    <!-- HLAVNÍ FORMULÁŘ (jen 3 prvky) -->
+    <section class="card">
+      <div class="content">
+        <div>
+          <label>Soubor (video / audio)</label>
+          <input id="file" type="file" accept="video/*,audio/*" />
+        </div>
+        <div style="margin-top:10px;">
+          <label>Název (pro stránku)</label>
+          <input id="title" type="text" placeholder="Např. Záznam webináře – Matematika" />
+        </div>
+        <div style="margin-top:10px;">
+          <label>Režim přehrávání</label>
+          <div class="modes" role="radiogroup" aria-label="Režim přehrávání">
+            <label class="radio"><input type="radio" name="mode" value="controls" checked> S ovladači (standard)</label>
+            <label class="radio"><input type="radio" name="mode" value="bg-video"> Background video (autoplay · muted · loop)</label>
+            <label class="radio"><input type="radio" name="mode" value="bg-audio"> Background audio (autoplay · loop)</label>
+          </div>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button id="go">Nahrát & vytvořit stránku</button>
+          <button id="list" class="sec" type="button">Načíst existující stránky</button>
+        </div>
+        <div id="status" class="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- EXISTUJÍCÍ STRÁNKY -->
+    <section class="card">
+      <div class="content">
+        <h2 style="margin:0 0 8px;font-size:18px;">Existující stránky</h2>
+        <div id="items" class="list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: vložení PAT jen při prvním použití / změně -->
+  <div id="authBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal">
+      <div class="content">
+        <h2 id="authTitle">Přihlášení k GitHubu (PAT)</h2>
+        <p class="hint">Vlož <strong>Personal Access Token</strong> s oprávněním <span class="kbd">contents:write</span> pro vybraný repozitář. Token se uloží jen do <em>localStorage</em> v tomto prohlížeči a lze jej kdykoliv smazat.</p>
+        <div style="margin-top:8px;">
+          <label>GitHub token (PAT)</label>
+          <input id="patInput" type="password" placeholder="token začínající github_pat_…" />
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button id="savePat">Uložit token</button>
+          <button id="cancelPat" class="ghost" type="button">Zrušit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*****  KONFIGURACE – UPRAV TADY A HOTOVO  *****/
+const GH_OWNER   = 'vividbooks';        // ← změň na svůj účet/organizaci
+const GH_REPO    = 'Prvouka';         // ← změň na cílový repozitář
+const GH_BRANCH  = 'main';              // větev pro zápis
+const GH_PAGES_BASE = '';               // nech prázdné pro auto: https://{owner}.github.io/{repo}/
+const FOLDER_UPLOADS = 'uploads';       // kam ukládat soubory
+const FOLDER_PAGES   = 'view';          // kam generovat stránky
+const GH_SIZE_LIMIT_MB = 90;            // klientský limit (GitHub ≈100 MB)
+/***********************************************/
+
+const LS_TOKEN_KEY = 'gh_pat_media_uploader';
+
+const $ = (id) => document.getElementById(id);
+const elStatus = $("status");
+
+function log(msg, cls = ""){
+  const line = `<div class="${cls}">${msg}</div>`;
+  elStatus.innerHTML += (elStatus.innerHTML ? "\n" : "") + line;
+  elStatus.scrollTop = elStatus.scrollHeight;
+}
+function clearStatus(){ elStatus.innerHTML = ""; }
+
+function slugify(str){
+  return (str || "").toString().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,80) || 'soubor';
+}
+
+function detectKind(file){
+  if (!file) return null;
+  if ((file.type||'').startsWith('video/')) return 'video';
+  if ((file.type||'').startsWith('audio/')) return 'audio';
+  const ext = (file.name.split('.').pop()||'').toLowerCase();
+  if (['mp4','webm','ogg','mkv','mov'].includes(ext)) return 'video';
+  if (['mp3','m4a','aac','wav','ogg','oga','flac'].includes(ext)) return 'audio';
+  return null;
+}
+
+function mimeFrom(file){
+  if (file && file.type) return file.type;
+  const ext = (file?.name?.split('.').pop()||'').toLowerCase();
+  const map = { mp4:'video/mp4', webm:'video/webm', ogg:'video/ogg', mov:'video/quicktime', mkv:'video/x-matroska',
+                mp3:'audio/mpeg', m4a:'audio/mp4', aac:'audio/aac', wav:'audio/wav', oga:'audio/ogg', flac:'audio/flac'};
+  return map[ext] || 'application/octet-stream';
+}
+
+function nowStamp(){
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2,'0');
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+
+async function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const res = String(r.result||'');
+      const i = res.indexOf(',');
+      resolve(i>=0 ? res.slice(i+1) : res);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function utf8ToBase64(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function buildDefaultBase(){
+  return `https://${GH_OWNER}.github.io/${GH_REPO}/`;
+}
+
+function playerPageHTML({ title, description, mediaRelPath, kind, mime, mode, bg = '#0b0c10' }){
+  const safeTitle = title || 'Media';
+  const src = mediaRelPath;
+
+  if (mode === 'bg-video') {
+    return `<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#000;color:#fff;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .video-bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
+    .overlay{position:relative;min-height:100vh;display:flex;align-items:flex-end}
+    .panel{width:100%;padding:24px;background:linear-gradient(180deg,transparent 0%, rgba(0,0,0,.5) 40%, rgba(0,0,0,.8) 100%)}
+    .card{max-width:980px;margin:0 auto;background:rgba(0,0,0,.35);backdrop-filter:saturate(1.2) blur(6px);border:1px solid rgba(255,255,255,.12);border-radius:16px}
+    .content{padding:18px}
+    h1{margin:0 0 8px;font-size:22px}
+    p{margin:0 0 12px;color:#cbd5e1}
+    a{color:#a8c7ff}
+  </style>
+</head>
+<body>
+  <video class="video-bg" src="${src}" autoplay muted loop playsinline></video>
+  <div class="overlay"><div class="panel"><div class="card"><div class="content">
+    <h1>${safeTitle}</h1>
+    ${description ? `<p>${description}</p>` : ''}
+    <p><a href="${src}" download>Stáhnout soubor</a></p>
+  </div></div></div></div>
+</body>
+</html>`;
+  }
+
+  if (mode === 'bg-audio') {
+    return `<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
+  <style>
+    :root{ --bg:${bg}; --text:#e8eef7; --muted:#9aa4b2; --panel:#111319; }
+    *{box-sizing:border-box}html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .card{background:linear-gradient(180deg,#10131a,#0c0f15);border:1px solid #1b2230;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .content{padding:18px}
+    h1{margin:0 0 8px;font-size:22px}
+    p{margin:0 0 12px;color:var(--muted)}
+    a{color:#5aa9ff}
+    .note{font-size:12px;color:#9aa4b2}
+  </style>
+</head>
+<body>
+  <audio src="${src}" autoplay loop></audio>
+  <div class="wrap"><div class="card"><div class="content">
+    <h1>${safeTitle}</h1>
+    ${description ? `<p>${description}</p>` : ''}
+    <p class="note">Audio se přehrává na pozadí (bez ovladačů). Některé prohlížeče mohou vyžadovat interakci.</p>
+    <p><a href="${src}" download>Stáhnout soubor</a></p>
+  </div></div></div>
+</body>
+</html>`;
+  }
+
+  const mediaTag = kind === 'video'
+    ? `<video controls playsinline preload="metadata" style="width:100%;height:auto;border-radius:16px;display:block;background:#000">
+         <source src="${src}" type="${mime}">Váš prohlížeč nepodporuje HTML5 video. <a href="${src}">Stáhnout</a>.
+       </video>`
+    : `<audio controls preload="metadata" style="width:100%;display:block">
+         <source src="${src}" type="${mime}">Váš prohlížeč nepodporuje HTML5 audio. <a href="${src}">Stáhnout</a>.
+       </audio>`;
+
+  return `<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+  <meta name="description" content="${description? String(description).replace(/"/g,'&quot;') : ''}">
+  <style>
+    :root{ --bg:${bg}; --text:#e8eef7; --muted:#9aa4b2; --panel:#111319; }
+    *{box-sizing:border-box}html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .card{background:linear-gradient(180deg,#10131a,#0c0f15);border:1px solid #1b2230;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .content{padding:18px}
+    h1{margin:0 0 8px;font-size:22px}
+    p{margin:0 0 12px;color:var(--muted)}
+    .player{padding:8px}
+    a{color:#5aa9ff}
+  </style>
+</head>
+<body>
+  <div class="wrap"><div class="card"><div class="content">
+    <h1>${safeTitle}</h1>
+    ${description ? `<p>${description}</p>` : ''}
+    <div class="player">${mediaTag}</div>
+    <p><a href="${src}" download>Stáhnout soubor</a></p>
+  </div></div></div>
+</body>
+</html>`;
+}
+
+async function githubPutFile({ path, contentBase64, message, token }){
+  const url = `https://api.github.com/repos/${encodeURIComponent(GH_OWNER)}/${encodeURIComponent(GH_REPO)}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': `token ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message, content: contentBase64, branch: GH_BRANCH })
+  });
+  if (!res.ok) { const text = await res.text(); throw new Error(`GitHub PUT ${path} → ${res.status}: ${text}`); }
+  return res.json();
+}
+
+async function githubListFolder({ path, token }){
+  const url = `https://api.github.com/repos/${encodeURIComponent(GH_OWNER)}/${encodeURIComponent(GH_REPO)}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(GH_BRANCH)}`;
+  const headers = { 'Accept':'application/vnd.github+json' };
+  if (token) headers['Authorization'] = `token ${token}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`GitHub LIST ${path} → ${res.status}`);
+  return res.json();
+}
+
+function getBaseUrl(){ return (GH_PAGES_BASE || buildDefaultBase()).replace(/\/$/, '') + '/'; }
+
+function required(v, name){ if(!v){ throw new Error(`Chybí: ${name}`); } return v; }
+
+function needToken(){ return !localStorage.getItem(LS_TOKEN_KEY); }
+function getToken(){ return localStorage.getItem(LS_TOKEN_KEY) || ''; }
+function openAuth(){ const b = $("authBackdrop"); b.style.display = 'flex'; $("patInput").focus(); }
+function closeAuth(){ const b = $("authBackdrop"); b.style.display = 'none'; }
+
+async function run(){
+  clearStatus();
+  try{
+    const file = $("file").files[0];
+    if (!file) throw new Error('Vyber soubor (video/audio).');
+    if (file.size > GH_SIZE_LIMIT_MB * 1024 * 1024) throw new Error(`Soubor je větší než ${GH_SIZE_LIMIT_MB} MB. Zvaž Git LFS.`);
+
+    const title = $("title").value.trim() || file.name.replace(/\.[^.]+$/, '');
+    const description = '';
+    const modeSel = (document.querySelector('input[name="mode"]:checked')?.value) || 'controls';
+    const kind = detectKind(file);
+    if (!kind) throw new Error('Neznámý typ – použij video/* nebo audio/* soubor.');
+
+    if (needToken()) { pendingAction = run; openAuth(); log('Je potřeba vložit GitHub token (PAT).'); return; }
+    const token = getToken();
+
+    let finalMode = modeSel;
+    if (modeSel === 'bg-video' && kind !== 'video') { finalMode = 'bg-audio'; log('ℹ️ Vybráno background video, ale soubor je audio → použiji background audio.'); }
+    if (modeSel === 'bg-audio' && kind !== 'audio') { finalMode = 'bg-video'; log('ℹ️ Vybráno background audio, ale soubor je video → použiji background video.'); }
+
+    const slug = slugify(title || file.name) + '-' + nowStamp();
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const uploadName = `${slug}.${ext || (kind==='video'?'mp4':'mp3')}`;
+
+    const mediaPath = `${FOLDER_UPLOADS}/${uploadName}`;
+    const pagePath  = `${FOLDER_PAGES}/${slug}.html`;
+
+    log(`Repo: <strong>${GH_OWNER}/${GH_REPO}</strong> · větev <strong>${GH_BRANCH}</strong>`);
+    log(`📦 Připravuji nahrát: <strong>${file.name}</strong> → <span class="mono">${mediaPath}</span>`);
+
+    const fileB64 = await fileToBase64(file);
+    log('⬆️  Nahrávám soubor do GitHubu…');
+    await githubPutFile({ path: mediaPath, contentBase64: fileB64, message: `Add media: ${uploadName}`, token });
+    log('<strong class="ok">✓ Soubor nahrán.</strong>');
+
+    const relToPage = `../${mediaPath.replace(/^\/+/, '')}`;
+    const mime = mimeFrom(file);
+    const html = playerPageHTML({ title, description, mediaRelPath: relToPage, kind, mime, mode: finalMode });
+    const htmlB64 = utf8ToBase64(html);
+
+    log(`🛠️  Generuji stránku (${finalMode}) → <span class="mono">${pagePath}</span>`);
+    await githubPutFile({ path: pagePath, contentBase64: htmlB64, message: `Create player page: ${slug}.html`, token });
+    log('<strong class="ok">✓ Stránka vytvořena.</strong>');
+
+    const base = getBaseUrl();
+    const finalUrl = base + pagePath;
+    log(`🔗 Odkaz: <strong><a href="${finalUrl}" target="_blank" rel="noopener">${finalUrl}</a></strong>`);
+
+    addItem({ name: `${slug}.html`, url: finalUrl, when: new Date().toLocaleString() });
+  }catch(err){ console.error(err); log(`⚠️ Chyba: ${err.message}`, 'err'); }
+}
+
+function addItem({ name, url, when }){
+  const box = $("items");
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML = `<div><a href="${url}" target="_blank" rel="noopener">${name}</a><div><small>${when? when + ' · ' : ''}${url}</small></div></div>
+  <div><button class="ghost" onclick="navigator.clipboard.writeText('${url}').then(()=>{this.textContent='Zkopírováno'; setTimeout(()=>this.textContent='Kopírovat odkaz',1200);})">Kopírovat odkaz</button></div>`;
+  box.prepend(el);
+}
+
+async function doList(){
+  clearStatus();
+  try{
+    log('📄 Načítám seznam stránek…');
+    const token = getToken(); // volitelné – pro veřejné repo není nutné
+    const items = await githubListFolder({ path: FOLDER_PAGES, token });
+    const htmls = items.filter(x => x.type === 'file' && x.name.endsWith('.html'));
+    $("items").innerHTML = '';
+    if (!htmls.length){ log('Žádné stránky zatím nejsou.'); return; }
+    htmls.sort((a,b)=> a.name.localeCompare(b.name)).reverse().forEach(x => {
+      const url = getBaseUrl() + FOLDER_PAGES + '/' + x.name;
+      addItem({ name: x.name, url, when: '' });
+    });
+    log(`<strong class="ok">✓ Nalezeno ${htmls.length} stránek.</strong>`);
+  }catch(err){ log(`⚠️ Chyba: ${err.message}`, 'err'); }
+}
+
+let pendingAction = null;
+$("go").addEventListener('click', (e)=>{ e.preventDefault(); run(); });
+$("list").addEventListener('click', (e)=>{ e.preventDefault(); doList(); });
+
+// Auth modal ovládání
+$("savePat").addEventListener('click', ()=>{
+  const v = $("patInput").value.trim();
+  if (!v) { alert('Vlož token.'); return; }
+  localStorage.setItem(LS_TOKEN_KEY, v);
+  $("patInput").value = '';
+  closeAuth();
+  if (typeof pendingAction === 'function') { const fn = pendingAction; pendingAction = null; fn(); }
+});
+$("cancelPat").addEventListener('click', ()=>{ closeAuth(); pendingAction = null; });
+
+// Otevři modal přes hash #token, smaž token přes ?logout
+window.addEventListener('DOMContentLoaded', ()=>{
+  if (location.search.includes('logout')) { localStorage.removeItem(LS_TOKEN_KEY); }
+  if (location.hash === '#token' || needToken()) { openAuth(); }
+  doList();
+});
+</script>
+</body>
+</html>
